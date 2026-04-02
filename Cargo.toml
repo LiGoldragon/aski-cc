@@ -1,0 +1,10 @@
+[package]
+name = "aski-cc"
+version = "0.1.0"
+edition = "2021"
+description = "aski compiler — Surface DB, macro expansion, aski-to-kernel pipeline"
+
+[dependencies]
+
+[build-dependencies]
+aski-rs = { path = "../aski-rs" }
