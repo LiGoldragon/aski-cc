@@ -7,11 +7,18 @@ ItemResult (Parsed (Tokens) Failed (Tokens))
 
 ;; Continue parsing after a result
 ItemResult [
-  unwrapParsed(:@Self) Tokens [ ___ ]
+  ;; FFI — match on variant, extract tokens, handle count ref/value
+  continueItems(@Self @Count U32) U32 [ ___ ]
 ]
 
 Tokens [
-  parseAllItems(@Self @Count U32) U32 [ ___ ]
+  parseAllItems(@Self @Count U32) U32 [
+    @Result ItemResult.new(@Self.parseItem)
+    ^@Result.continueItems(@Count)
+  ]
+
+  ;; FFI — increment count and recurse (ref/value mismatch in codegen)
+  parseAllItemsNext(@Self @Count U32) U32 [ ___ ]
 
   parseItem(@Self) ItemResult [
     @Toks Tokens.new(@Self.skipNewlines)

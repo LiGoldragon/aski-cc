@@ -21,14 +21,14 @@ fn parse_chart_with_aski_parser() {
     // Remove generated main — we provide our own
     let generated = generated.replace("fn main() {", "fn _gen_main() {");
 
-    // Add FFI stubs
+    // FFI stubs for item counting (ref/value mismatch for primitive params)
     let generated = generated.replace(
-        "    pub fn unwrap_parsed(&self) -> Tokens {\n        todo!()\n    }",
-        "    pub fn unwrap_parsed(&self) -> Tokens {\n        match self {\n            ItemResult::Parsed(t) => t.clone(),\n            ItemResult::Failed(t) => t.clone(),\n        }\n    }",
+        "    pub fn continue_items(self, count: &u32) -> u32 {\n        todo!()\n    }",
+        "    pub fn continue_items(self, count: &u32) -> u32 {\n        match self {\n            ItemResult::Parsed(toks) => toks.parse_all_items(&(count + 1)),\n            ItemResult::Failed(_) => *count,\n        }\n    }",
     );
     let generated = generated.replace(
-        "    pub fn parse_all_items(self, count: &u32) -> u32 {\n        todo!()\n    }",
-        "    pub fn parse_all_items(self, count: &u32) -> u32 {\n        let result = self.parse_item();\n        match result {\n            ItemResult::Parsed(t) => t.parse_all_items(&(count + 1)),\n            ItemResult::Failed(_) => *count,\n        }\n    }",
+        "    pub fn parse_all_items_next(self, count: &u32) -> u32 {\n        todo!()\n    }",
+        "    pub fn parse_all_items_next(self, count: &u32) -> u32 {\n        self.parse_all_items(&(count + 1))\n    }",
     );
 
     // Lex chart.aski
