@@ -1,48 +1,132 @@
-(Parser ItemResult)
+(Parser ItemResult parseItem parseAllItems)
 [Token (Token)
  Tokens (_)]
 
+;; Item parse result — carries remaining tokens
 ItemResult (Parsed (Tokens) Failed (Tokens))
 
+;; Continue parsing after a result
+ItemResult [
+  unwrapParsed(:@Self) Tokens [ ___ ]
+]
+
 Tokens [
+  parseAllItems(@Self @Count U32) U32 [ ___ ]
+
   parseItem(@Self) ItemResult [
     @Toks Tokens.new(@Self.skipNewlines)
     @Done Bool.new(@Toks.atEnd)
     ^(| @Done
       (True)  Failed(@Toks)
-      (False) @Toks.tryPascal
+      (False) @Toks.dispatchItem
     |)
   ]
 
-  tryPascal(@Self) ItemResult [
-    @Is Bool.new(@Self.peekIsPascal)
-    ^(| @Is
-      (True)  @Self.advance.skipNewlines.tryPascalBody
+  dispatchItem(@Self) ItemResult [
+    @IsPascal Bool.new(@Self.peekIsPascal)
+    ^(| @IsPascal
+      (True) @Self.parsePascalItem
+      (False) @Self.tryCamel
+    |)
+  ]
+
+  tryCamel(@Self) ItemResult [
+    @IsCamel Bool.new(@Self.peekIsCamel)
+    ^(| @IsCamel
+      (True) @Self.parseCamelItem
+      (False) @Self.tryBang
+    |)
+  ]
+
+  tryBang(@Self) ItemResult [
+    @IsBang Bool.new(@Self.peekIsBang)
+    ^(| @IsBang
+      (True) @Self.parseBangItem
       (False) Failed(@Self)
     |)
   ]
 
-  tryPascalBody(@Self) ItemResult [
+  parsePascalItem(@Self) ItemResult [
+    ^@Self.advance.skipNewlines.checkPascalNotEnd
+  ]
+
+  checkPascalNotEnd(@Self) ItemResult [
+    @Done Bool.new(@Self.atEnd)
+    ^(| @Done
+      (True) Failed(@Self)
+      (False) @Self.checkPascalBody
+    |)
+  ]
+
+  checkPascalBody(@Self) ItemResult [
     @IsLP Bool.new(@Self.peekIsLParen)
     ^(| @IsLP
-      (True)  @Self.advance.skipBalancedParen
-      (False) @Self.tryBrace
+      (True) @Self.advance.skipBalancedParen
+      (False) @Self.checkPascalBrace
     |)
   ]
 
-  tryBrace(@Self) ItemResult [
+  checkPascalBrace(@Self) ItemResult [
     @IsLB Bool.new(@Self.peekIsLBrace)
     ^(| @IsLB
-      (True)  @Self.advance.skipBalancedBrace
-      (False) @Self.tryBracket
+      (True) @Self.advance.skipBalancedBrace
+      (False) @Self.checkPascalBracket
     |)
   ]
 
-  tryBracket(@Self) ItemResult [
+  checkPascalBracket(@Self) ItemResult [
     @IsLBr Bool.new(@Self.peekIsLBracket)
     ^(| @IsLBr
-      (True)  @Self.advance.skipBalancedBracket
+      (True) @Self.advance.skipBalancedBracket
       (False) Failed(@Self)
+    |)
+  ]
+
+  parseCamelItem(@Self) ItemResult [
+    ^@Self.advance.skipNewlines.checkCamelNotEnd
+  ]
+
+  checkCamelNotEnd(@Self) ItemResult [
+    @Done Bool.new(@Self.atEnd)
+    ^(| @Done
+      (True) Failed(@Self)
+      (False) @Self.checkCamelBody
+    |)
+  ]
+
+  checkCamelBody(@Self) ItemResult [
+    @IsLP Bool.new(@Self.peekIsLParen)
+    ^(| @IsLP
+      (True) @Self.advance.skipBalancedParen
+      (False) @Self.checkCamelBracket
+    |)
+  ]
+
+  checkCamelBracket(@Self) ItemResult [
+    @IsLBr Bool.new(@Self.peekIsLBracket)
+    ^(| @IsLBr
+      (True) @Self.advance.skipBalancedBracket
+      (False) Failed(@Self)
+    |)
+  ]
+
+  parseBangItem(@Self) ItemResult [
+    ^@Self.advance.advance.skipNewlines.skipToLBrace
+  ]
+
+  skipToLBrace(@Self) ItemResult [
+    @Done Bool.new(@Self.atEnd)
+    ^(| @Done
+      (True) Failed(@Self)
+      (False) @Self.checkLBrace
+    |)
+  ]
+
+  checkLBrace(@Self) ItemResult [
+    @IsLB Bool.new(@Self.peekIsLBrace)
+    ^(| @IsLB
+      (True) @Self.advance.skipBalancedBrace
+      (False) @Self.advance.skipToLBrace
     |)
   ]
 
@@ -50,7 +134,7 @@ Tokens [
     @Toks Tokens.new(@Self.skipNewlines)
     @Done Bool.new(@Toks.atEnd)
     ^(| @Done
-      (True)  Failed(@Toks)
+      (True) Failed(@Toks)
       (False) @Toks.checkRP
     |)
   ]
@@ -58,8 +142,40 @@ Tokens [
   checkRP(@Self) ItemResult [
     @Is Bool.new(@Self.peekIsRParen)
     ^(| @Is
-      (True)  Parsed(@Self.advance)
+      (True) Parsed(@Self.advance)
+      (False) @Self.innerParen
+    |)
+  ]
+
+  innerParen(@Self) ItemResult [
+    @IsNested Bool.new(@Self.peekIsLParen)
+    ^(| @IsNested
+      (True) @Self.advance.skipNestedParen
+      (False) @Self.innerParenBrace
+    |)
+  ]
+
+  innerParenBrace(@Self) ItemResult [
+    @IsNested Bool.new(@Self.peekIsLBrace)
+    ^(| @IsNested
+      (True) @Self.advance.skipNestedBrace
       (False) @Self.advance.skipBalancedParen
+    |)
+  ]
+
+  skipNestedParen(@Self) ItemResult [
+    @Done Bool.new(@Self.atEnd)
+    ^(| @Done
+      (True) Failed(@Self)
+      (False) @Self.checkNestedRP
+    |)
+  ]
+
+  checkNestedRP(@Self) ItemResult [
+    @Is Bool.new(@Self.peekIsRParen)
+    ^(| @Is
+      (True) @Self.advance.skipBalancedParen
+      (False) @Self.advance.skipNestedParen
     |)
   ]
 
@@ -67,16 +183,32 @@ Tokens [
     @Toks Tokens.new(@Self.skipNewlines)
     @Done Bool.new(@Toks.atEnd)
     ^(| @Done
-      (True)  Failed(@Toks)
-      (False) @Toks.checkRB
+      (True) Failed(@Toks)
+      (False) @Toks.checkRBrace
     |)
   ]
 
-  checkRB(@Self) ItemResult [
+  checkRBrace(@Self) ItemResult [
     @Is Bool.new(@Self.peekIsRBrace)
     ^(| @Is
-      (True)  Parsed(@Self.advance)
+      (True) Parsed(@Self.advance)
       (False) @Self.advance.skipBalancedBrace
+    |)
+  ]
+
+  skipNestedBrace(@Self) ItemResult [
+    @Done Bool.new(@Self.atEnd)
+    ^(| @Done
+      (True) Failed(@Self)
+      (False) @Self.checkNestedRBrace
+    |)
+  ]
+
+  checkNestedRBrace(@Self) ItemResult [
+    @Is Bool.new(@Self.peekIsRBrace)
+    ^(| @Is
+      (True) @Self.advance.skipBalancedParen
+      (False) @Self.advance.skipNestedBrace
     |)
   ]
 
@@ -84,16 +216,64 @@ Tokens [
     @Toks Tokens.new(@Self.skipNewlines)
     @Done Bool.new(@Toks.atEnd)
     ^(| @Done
-      (True)  Failed(@Toks)
-      (False) @Toks.checkRBr
+      (True) Failed(@Toks)
+      (False) @Toks.checkRBracket
     |)
   ]
 
-  checkRBr(@Self) ItemResult [
+  checkRBracket(@Self) ItemResult [
     @Is Bool.new(@Self.peekIsRBracket)
     ^(| @Is
-      (True)  Parsed(@Self.advance)
+      (True) Parsed(@Self.advance)
+      (False) @Self.innerBracket
+    |)
+  ]
+
+  innerBracket(@Self) ItemResult [
+    @IsNested Bool.new(@Self.peekIsLBracket)
+    ^(| @IsNested
+      (True) @Self.advance.skipNestedBracket
+      (False) @Self.innerBracketComp
+    |)
+  ]
+
+  innerBracketComp(@Self) ItemResult [
+    @IsComp Bool.new(@Self.peekIsCompositionOpen)
+    ^(| @IsComp
+      (True) @Self.advance.skipNestedComp
       (False) @Self.advance.skipBalancedBracket
+    |)
+  ]
+
+  skipNestedBracket(@Self) ItemResult [
+    @Done Bool.new(@Self.atEnd)
+    ^(| @Done
+      (True) Failed(@Self)
+      (False) @Self.checkNestedRBracket
+    |)
+  ]
+
+  checkNestedRBracket(@Self) ItemResult [
+    @Is Bool.new(@Self.peekIsRBracket)
+    ^(| @Is
+      (True) @Self.advance.skipBalancedBracket
+      (False) @Self.advance.skipNestedBracket
+    |)
+  ]
+
+  skipNestedComp(@Self) ItemResult [
+    @Done Bool.new(@Self.atEnd)
+    ^(| @Done
+      (True) Failed(@Self)
+      (False) @Self.checkNestedCompClose
+    |)
+  ]
+
+  checkNestedCompClose(@Self) ItemResult [
+    @Is Bool.new(@Self.peekIsCompositionClose)
+    ^(| @Is
+      (True) @Self.advance.skipBalancedBracket
+      (False) @Self.advance.skipNestedComp
     |)
   ]
 ]

@@ -1,5 +1,3 @@
-//! Test: parse chart.aski tokens with the aski-cc parser
-
 use std::io::Write;
 use std::process::Command;
 
@@ -20,14 +18,24 @@ fn parse_chart_with_aski_parser() {
     )
     .expect("failed to compile aski-cc");
 
-    // Remove generated main — we'll provide our own
-    let generated = generated.replace("fn main() {", "fn _generated_main() {");
+    // Remove generated main — we provide our own
+    let generated = generated.replace("fn main() {", "fn _gen_main() {");
+
+    // Add FFI stubs
+    let generated = generated.replace(
+        "    pub fn unwrap_parsed(&self) -> Tokens {\n        todo!()\n    }",
+        "    pub fn unwrap_parsed(&self) -> Tokens {\n        match self {\n            ItemResult::Parsed(t) => t.clone(),\n            ItemResult::Failed(t) => t.clone(),\n        }\n    }",
+    );
+    let generated = generated.replace(
+        "    pub fn parse_all_items(self, count: &u32) -> u32 {\n        todo!()\n    }",
+        "    pub fn parse_all_items(self, count: &u32) -> u32 {\n        let result = self.parse_item();\n        match result {\n            ItemResult::Parsed(t) => t.parse_all_items(&(count + 1)),\n            ItemResult::Failed(_) => *count,\n        }\n    }",
+    );
 
     // Lex chart.aski
     let chart_source = std::fs::read_to_string("../astro-aski/aski/chart.aski")
         .expect("failed to read chart.aski");
     let spanned = aski_rs::lexer::lex(&chart_source).expect("lex failed");
-    
+
     let mut token_lits = Vec::new();
     for st in &spanned {
         use aski_rs::lexer::Token as RT;
@@ -48,6 +56,7 @@ fn parse_chart_with_aski_parser() {
             RT::Caret => "Token::Caret",
             RT::Underscore => "Token::Underscore",
             RT::Newline => "Token::Newline",
+            RT::Pipe => "Token::Pipe",
             RT::PascalIdent(s) => {
                 token_lits.push(format!("Token::PascalIdent(\"{s}\".to_string())"));
                 continue;
@@ -56,8 +65,7 @@ fn parse_chart_with_aski_parser() {
                 token_lits.push(format!("Token::CamelIdent(\"{s}\".to_string())"));
                 continue;
             }
-            RT::Pipe => "Token::Pipe",
-            _ => "Token::Newline", // fallback
+            _ => "Token::Newline",
         };
         token_lits.push(lit.to_string());
     }
@@ -70,9 +78,9 @@ fn main() {{
         {}
     ];
     println!("Lexed {{}} tokens from chart.aski", tokens.len());
-    
+
     let t = Tokens {{ stream: tokens, pos: 0 }};
-    
+
     // Skip module header: ( ... )
     let t = t.skip_newlines();
     let t = if t.peek_is_l_paren() {{
@@ -82,34 +90,10 @@ fn main() {{
         }}
         if !t2.at_end() {{ t2.advance() }} else {{ t2 }}
     }} else {{ t }};
-    
-    // Parse items one at a time
-    let mut count: u32 = 0;
-    let mut current = t;
-    loop {{
-        let c = current.skip_newlines();
-        if c.at_end() {{ 
-            current = c;
-            break; 
-        }}
-        let pos_before = c.pos;
-        let result = c.parse_item();
-        match result {{
-            ItemResult::Ok => {{
-                count += 1;
-                println!("  item {{}} parsed (was at pos {{}})", count, pos_before);
-                // PROBLEM: we don't know the new position after parse_item
-                // because ItemResult doesn't carry it.
-                // For now, just report we parsed one item successfully.
-                break;
-            }}
-            ItemResult::NotOk => {{
-                println!("  failed at pos {{}}", pos_before);
-                break;
-            }}
-        }}
-    }}
-    println!("Total: {{}} items from chart.aski", count);
+
+    // Parse all items using the aski parser
+    let count = t.parse_all_items(&0);
+    println!("Parsed {{}} items from chart.aski", count);
 }}
 "#, token_lits.join(",\n        "));
 
@@ -134,7 +118,12 @@ fn main() {{
     let run = Command::new(&bin_path).output().expect("run");
     let stdout = String::from_utf8_lossy(&run.stdout);
     eprintln!("Output:\n{stdout}");
-    assert!(stdout.contains("item 1 parsed"), "should parse at least one item:\n{stdout}");
+
+    // chart.aski has 13 items: 7 domains + 3 structs + 3 impl blocks
+    assert!(
+        stdout.contains("Parsed 13 items"),
+        "should parse all 13 items from chart.aski:\n{stdout}"
+    );
 
     let _ = std::fs::remove_file(&rs_path);
     let _ = std::fs::remove_file(&bin_path);
