@@ -67,6 +67,16 @@ fn parse_chart_with_aski_parser() {
 {generated}
 
 fn main() {{
+    // Mutually-recursive aski methods need larger stack in debug mode
+    std::thread::Builder::new()
+        .stack_size(16 * 1024 * 1024)
+        .spawn(_real_main)
+        .unwrap()
+        .join()
+        .unwrap();
+}}
+
+fn _real_main() {{
     let tokens = vec![
         {}
     ];
