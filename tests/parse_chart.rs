@@ -21,15 +21,8 @@ fn parse_chart_with_aski_parser() {
     // Remove generated main — we provide our own
     let generated = generated.replace("fn main() {", "fn _gen_main() {");
 
-    // FFI stubs for item counting (ref/value mismatch for primitive params)
-    let generated = generated.replace(
-        "    pub fn continue_items(self, count: &u32) -> u32 {\n        todo!()\n    }",
-        "    pub fn continue_items(self, count: &u32) -> u32 {\n        match self {\n            ItemResult::Parsed(toks) => toks.parse_all_items(&(count + 1)),\n            ItemResult::Failed(_) => *count,\n        }\n    }",
-    );
-    let generated = generated.replace(
-        "    pub fn parse_all_items_next(self, count: &u32) -> u32 {\n        todo!()\n    }",
-        "    pub fn parse_all_items_next(self, count: &u32) -> u32 {\n        self.parse_all_items(&(count + 1))\n    }",
-    );
+    // No FFI stubs — everything is pure aski
+    assert!(!generated.contains("todo!()"), "should have no FFI stubs:\n{generated}");
 
     // Lex chart.aski
     let chart_source = std::fs::read_to_string("../astro-aski/aski/chart.aski")
