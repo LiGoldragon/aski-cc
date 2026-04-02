@@ -2,10 +2,98 @@
 [Token (Token)
  Tokens (_)]
 
-ItemResult (Ok NotOk)
+ItemResult (Parsed (Tokens) Failed (Tokens))
 
 Tokens [
   parseItem(@Self) ItemResult [
-    ^Ok
+    @Toks Tokens.new(@Self.skipNewlines)
+    @Done Bool.new(@Toks.atEnd)
+    ^(| @Done
+      (True)  Failed(@Toks)
+      (False) @Toks.tryPascal
+    |)
+  ]
+
+  tryPascal(@Self) ItemResult [
+    @Is Bool.new(@Self.peekIsPascal)
+    ^(| @Is
+      (True)  @Self.advance.skipNewlines.tryPascalBody
+      (False) Failed(@Self)
+    |)
+  ]
+
+  tryPascalBody(@Self) ItemResult [
+    @IsLP Bool.new(@Self.peekIsLParen)
+    ^(| @IsLP
+      (True)  @Self.advance.skipBalancedParen
+      (False) @Self.tryBrace
+    |)
+  ]
+
+  tryBrace(@Self) ItemResult [
+    @IsLB Bool.new(@Self.peekIsLBrace)
+    ^(| @IsLB
+      (True)  @Self.advance.skipBalancedBrace
+      (False) @Self.tryBracket
+    |)
+  ]
+
+  tryBracket(@Self) ItemResult [
+    @IsLBr Bool.new(@Self.peekIsLBracket)
+    ^(| @IsLBr
+      (True)  @Self.advance.skipBalancedBracket
+      (False) Failed(@Self)
+    |)
+  ]
+
+  skipBalancedParen(@Self) ItemResult [
+    @Toks Tokens.new(@Self.skipNewlines)
+    @Done Bool.new(@Toks.atEnd)
+    ^(| @Done
+      (True)  Failed(@Toks)
+      (False) @Toks.checkRP
+    |)
+  ]
+
+  checkRP(@Self) ItemResult [
+    @Is Bool.new(@Self.peekIsRParen)
+    ^(| @Is
+      (True)  Parsed(@Self.advance)
+      (False) @Self.advance.skipBalancedParen
+    |)
+  ]
+
+  skipBalancedBrace(@Self) ItemResult [
+    @Toks Tokens.new(@Self.skipNewlines)
+    @Done Bool.new(@Toks.atEnd)
+    ^(| @Done
+      (True)  Failed(@Toks)
+      (False) @Toks.checkRB
+    |)
+  ]
+
+  checkRB(@Self) ItemResult [
+    @Is Bool.new(@Self.peekIsRBrace)
+    ^(| @Is
+      (True)  Parsed(@Self.advance)
+      (False) @Self.advance.skipBalancedBrace
+    |)
+  ]
+
+  skipBalancedBracket(@Self) ItemResult [
+    @Toks Tokens.new(@Self.skipNewlines)
+    @Done Bool.new(@Toks.atEnd)
+    ^(| @Done
+      (True)  Failed(@Toks)
+      (False) @Toks.checkRBr
+    |)
+  ]
+
+  checkRBr(@Self) ItemResult [
+    @Is Bool.new(@Self.peekIsRBracket)
+    ^(| @Is
+      (True)  Parsed(@Self.advance)
+      (False) @Self.advance.skipBalancedBracket
+    |)
   ]
 ]
