@@ -5,6 +5,7 @@ edition = "2021"
 description = "aski compiler — Surface DB, macro expansion, aski-to-kernel pipeline"
 
 [dependencies]
+ascent = "0.8"
 
 [build-dependencies]
 aski-rs = { path = "../aski-rs" }
