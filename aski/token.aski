@@ -5,7 +5,7 @@
 
 Token (
   LParen RParen LBracket RBracket LBrace RBrace
-  MatchOpen MatchClose
+  CompositionOpen CompositionClose
   Dot At Dollar Caret Gt Lt Ampersand Tilde
   Question Bang Hash Pipe Tick Colon
   Plus Minus Star Slash Percent

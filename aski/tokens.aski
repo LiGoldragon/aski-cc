@@ -1,6 +1,6 @@
 (Tokens Tokens advance skipNewlines peekIsPascal peekIsLParen
         peekIsRParen peekIsLBrace peekIsRBrace peekIsCamel
-        peekIsLBracket peekIsRBracket peekIsMatchOpen peekIsMatchClose
+        peekIsLBracket peekIsRBracket peekIsCompositionOpen peekIsCompositionClose
         peekIsBorrowSelf peekIsColon peekIsAt peekIsTilde peekIsBang
         peekIsUnderscore peekIsStub peekIsPipe)
 [Token (Token)]
@@ -20,8 +20,8 @@ Tokens [
   peekIsRBrace(:@Self) Bool [ ^@Self.peek.isRBrace ]
   peekIsLBracket(:@Self) Bool [ ^@Self.peek.isLBracket ]
   peekIsRBracket(:@Self) Bool [ ^@Self.peek.isRBracket ]
-  peekIsMatchOpen(:@Self) Bool [ ^@Self.peek.isMatchOpen ]
-  peekIsMatchClose(:@Self) Bool [ ^@Self.peek.isMatchClose ]
+  peekIsCompositionOpen(:@Self) Bool [ ^@Self.peek.isCompositionOpen ]
+  peekIsCompositionClose(:@Self) Bool [ ^@Self.peek.isCompositionClose ]
   peekIsPascal(:@Self) Bool [ ^@Self.peek.isPascal ]
   peekIsCamel(:@Self) Bool [ ^@Self.peek.isCamel ]
   peekIsColon(:@Self) Bool [ ^@Self.peek.isColon ]
@@ -61,8 +61,8 @@ Token [
   isRBrace(:@Self) Bool (| (RBrace) True (_) False |)
   isLBracket(:@Self) Bool (| (LBracket) True (_) False |)
   isRBracket(:@Self) Bool (| (RBracket) True (_) False |)
-  isMatchOpen(:@Self) Bool (| (MatchOpen) True (_) False |)
-  isMatchClose(:@Self) Bool (| (MatchClose) True (_) False |)
+  isCompositionOpen(:@Self) Bool (| (CompositionOpen) True (_) False |)
+  isCompositionClose(:@Self) Bool (| (CompositionClose) True (_) False |)
   isPascal(:@Self) Bool (| (PascalIdent) True (_) False |)
   isCamel(:@Self) Bool (| (CamelIdent) True (_) False |)
   isColon(:@Self) Bool (| (Colon) True (_) False |)

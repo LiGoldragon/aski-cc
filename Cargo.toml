@@ -8,3 +8,6 @@ description = "aski compiler — Surface DB, macro expansion, aski-to-kernel pip
 
 [build-dependencies]
 aski-rs = { path = "../aski-rs" }
+
+[dev-dependencies]
+aski-rs = { path = "../aski-rs" }

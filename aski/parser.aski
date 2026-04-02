@@ -1,93 +1,279 @@
-(Parser ParseResult DomainResult StructResult)
+(Parser ItemResult parseItem parseItems)
 [Token (Token)
  Tokens (Tokens advance skipNewlines peekIsPascal peekIsLParen
-         peekIsRParen peekIsLBrace peekIsRBrace)]
+         peekIsRParen peekIsLBrace peekIsRBrace peekIsCamel
+         peekIsLBracket peekIsRBracket peekIsCompositionOpen peekIsCompositionClose
+         peekIsBang)]
 
-;; Parse results
-ParseResult (Parsed Failed)
+;; Item parse result — Parsed carries remaining tokens, Failed carries original
+ItemResult (Ok NotOk)
 
-;; Domain parse result with variant count
-DomainResult { Count U32 Remaining Tokens }
+;; === Top-level item parser ===
 
-;; Struct parse result with field count
-StructResult { Count U32 Remaining Tokens }
-
-;; Domain parser — parses PascalName ( Variant1 Variant2 ... )
 Tokens [
-  parseDomain(@Self) ParseResult [
-    @Toks Tokens.new(@Self.skipNewlines)
-    @HasName Bool.new(@Toks.peekIsPascal)
-    ^(| @HasName
-      (True) @Toks.advance.skipNewlines.tryDomainOpen
-      (False) Failed
-    |)
-  ]
-
-  tryDomainOpen(@Self) ParseResult [
-    @IsOpen Bool.new(@Self.peekIsLParen)
-    ^(| @IsOpen
-      (True) @Self.advance.countVariants
-      (False) Failed
-    |)
-  ]
-
-  countVariants(@Self) ParseResult [
+  parseItem(@Self) ItemResult [
     @Toks Tokens.new(@Self.skipNewlines)
     @Done Bool.new(@Toks.atEnd)
     ^(| @Done
-      (True)  Failed
-      (False) @Toks.checkCloseOrVariant
+      (True)  NotOk
+      (False) @Toks.dispatchItem
     |)
   ]
 
-  checkCloseOrVariant(@Self) ParseResult [
-    @IsClose Bool.new(@Self.peekIsRParen)
-    ^(| @IsClose
-      (True)  Parsed
-      (False) @Self.skipVariantAndContinue
-    |)
-  ]
-
-  skipVariantAndContinue(@Self) ParseResult [
+  dispatchItem(@Self) ItemResult [
     @IsPascal Bool.new(@Self.peekIsPascal)
     ^(| @IsPascal
-      (True)  @Self.advance.countVariants
-      (False) @Self.advance.countVariants
+      (True) @Self.parsePascalItem
+      (False) @Self.tryCamelItem
     |)
   ]
 
-  ;; Struct parser — parses PascalName { Field Type ... }
-  parseStruct(@Self) ParseResult [
-    @Toks Tokens.new(@Self.skipNewlines)
-    @HasName Bool.new(@Toks.peekIsPascal)
-    ^(| @HasName
-      (True) @Toks.advance.skipNewlines.tryStructOpen
-      (False) Failed
+  tryCamelItem(@Self) ItemResult [
+    @IsCamel Bool.new(@Self.peekIsCamel)
+    ^(| @IsCamel
+      (True) @Self.parseCamelItem
+      (False) @Self.tryBangItem
     |)
   ]
 
-  tryStructOpen(@Self) ParseResult [
-    @IsOpen Bool.new(@Self.peekIsLBrace)
-    ^(| @IsOpen
-      (True) @Self.advance.skipToCloseBrace
-      (False) Failed
+  tryBangItem(@Self) ItemResult [
+    @IsBang Bool.new(@Self.peekIsBang)
+    ^(| @IsBang
+      (True)  @Self.parseConstItem
+      (False) NotOk
     |)
   ]
 
-  skipToCloseBrace(@Self) ParseResult [
+  ;; PascalCase: Name ( = domain, Name { = struct, Name [ = impl
+  parsePascalItem(@Self) ItemResult [
+    @After Tokens.new(@Self.advance.skipNewlines)
+    @Done Bool.new(@After.atEnd)
+    ^(| @Done
+      (True) NotOk
+      (False) @After.checkPascalBody
+    |)
+  ]
+
+  checkPascalBody(@Self) ItemResult [
+    @IsLP Bool.new(@Self.peekIsLParen)
+    ^(| @IsLP
+      (True) @Self.advance.skipBalancedParen
+      (False) @Self.checkPascalBrace
+    |)
+  ]
+
+  checkPascalBrace(@Self) ItemResult [
+    @IsLB Bool.new(@Self.peekIsLBrace)
+    ^(| @IsLB
+      (True) @Self.advance.skipBalancedBrace
+      (False) @Self.checkPascalBracket
+    |)
+  ]
+
+  checkPascalBracket(@Self) ItemResult [
+    @IsLBr Bool.new(@Self.peekIsLBracket)
+    ^(| @IsLBr
+      (True) @Self.advance.skipBalancedBracket
+      (False) NotOk
+    |)
+  ]
+
+  ;; camelCase: trait decl (name (...)) or trait impl (name [...])
+  parseCamelItem(@Self) ItemResult [
+    @After Tokens.new(@Self.advance.skipNewlines)
+    @Done Bool.new(@After.atEnd)
+    ^(| @Done
+      (True) NotOk
+      (False) @After.checkCamelBody
+    |)
+  ]
+
+  checkCamelBody(@Self) ItemResult [
+    @IsLP Bool.new(@Self.peekIsLParen)
+    ^(| @IsLP
+      (True) @Self.advance.skipBalancedParen
+      (False) @Self.checkCamelBracket
+    |)
+  ]
+
+  checkCamelBracket(@Self) ItemResult [
+    @IsLBr Bool.new(@Self.peekIsLBracket)
+    ^(| @IsLBr
+      (True) @Self.advance.skipBalancedBracket
+      (False) NotOk
+    |)
+  ]
+
+  ;; const: !Name Type { value }
+  parseConstItem(@Self) ItemResult [
+    ^@Self.advance.advance.skipNewlines.skipToLBrace
+  ]
+
+  skipToLBrace(@Self) ItemResult [
+    @Done Bool.new(@Self.atEnd)
+    ^(| @Done
+      (True) NotOk
+      (False) @Self.checkLBrace
+    |)
+  ]
+
+  checkLBrace(@Self) ItemResult [
+    @IsLB Bool.new(@Self.peekIsLBrace)
+    ^(| @IsLB
+      (True) @Self.advance.skipBalancedBrace
+      (False) @Self.advance.skipToLBrace
+    |)
+  ]
+
+  ;; === Balanced delimiter skippers ===
+
+  ;; Skip to matching ) — handles nested ()
+  skipBalancedParen(@Self) ItemResult [
     @Toks Tokens.new(@Self.skipNewlines)
     @Done Bool.new(@Toks.atEnd)
     ^(| @Done
-      (True) Failed
-      (False) @Toks.checkCloseBrace
+      (True) NotOk
+      (False) @Toks.checkBalancedParen
     |)
   ]
 
-  checkCloseBrace(@Self) ParseResult [
+  checkBalancedParen(@Self) ItemResult [
+    @IsClose Bool.new(@Self.peekIsRParen)
+    ^(| @IsClose
+      (True) Ok
+      (False) @Self.innerBalancedParen
+    |)
+  ]
+
+  innerBalancedParen(@Self) ItemResult [
+    @IsNested Bool.new(@Self.peekIsLParen)
+    ^(| @IsNested
+      (True) @Self.advance.skipNestedParen
+      (False) @Self.innerBalancedParenBrace
+    |)
+  ]
+
+  innerBalancedParenBrace(@Self) ItemResult [
+    @IsNested Bool.new(@Self.peekIsLBrace)
+    ^(| @IsNested
+      (True) @Self.advance.skipNestedBrace
+      (False) @Self.advance.skipBalancedParen
+    |)
+  ]
+
+  skipNestedParen(@Self) ItemResult [
+    @Done Bool.new(@Self.atEnd)
+    ^(| @Done
+      (True) NotOk
+      (False) @Self.checkNestedParen
+    |)
+  ]
+
+  checkNestedParen(@Self) ItemResult [
+    @IsClose Bool.new(@Self.peekIsRParen)
+    ^(| @IsClose
+      (True) @Self.advance.skipBalancedParen
+      (False) @Self.advance.skipNestedParen
+    |)
+  ]
+
+  ;; Skip to matching } — handles nested {}
+  skipBalancedBrace(@Self) ItemResult [
+    @Toks Tokens.new(@Self.skipNewlines)
+    @Done Bool.new(@Toks.atEnd)
+    ^(| @Done
+      (True) NotOk
+      (False) @Toks.checkBalancedBrace
+    |)
+  ]
+
+  checkBalancedBrace(@Self) ItemResult [
     @IsClose Bool.new(@Self.peekIsRBrace)
     ^(| @IsClose
-      (True)  Parsed
-      (False) @Self.advance.skipToCloseBrace
+      (True) Ok
+      (False) @Self.advance.skipBalancedBrace
+    |)
+  ]
+
+  skipNestedBrace(@Self) ItemResult [
+    @Done Bool.new(@Self.atEnd)
+    ^(| @Done
+      (True) NotOk
+      (False) @Self.checkNestedBrace
+    |)
+  ]
+
+  checkNestedBrace(@Self) ItemResult [
+    @IsClose Bool.new(@Self.peekIsRBrace)
+    ^(| @IsClose
+      (True) @Self.advance.skipBalancedParen
+      (False) @Self.advance.skipNestedBrace
+    |)
+  ]
+
+  ;; Skip to matching ] — handles nested [], (| |)
+  skipBalancedBracket(@Self) ItemResult [
+    @Toks Tokens.new(@Self.skipNewlines)
+    @Done Bool.new(@Toks.atEnd)
+    ^(| @Done
+      (True) NotOk
+      (False) @Toks.checkBalancedBracket
+    |)
+  ]
+
+  checkBalancedBracket(@Self) ItemResult [
+    @IsClose Bool.new(@Self.peekIsRBracket)
+    ^(| @IsClose
+      (True) Ok
+      (False) @Self.innerBalancedBracket
+    |)
+  ]
+
+  innerBalancedBracket(@Self) ItemResult [
+    @IsNested Bool.new(@Self.peekIsLBracket)
+    ^(| @IsNested
+      (True) @Self.advance.skipNestedBracket
+      (False) @Self.innerBracketMatch
+    |)
+  ]
+
+  innerBracketMatch(@Self) ItemResult [
+    @IsMatch Bool.new(@Self.peekIsCompositionOpen)
+    ^(| @IsMatch
+      (True) @Self.advance.skipNestedMatch
+      (False) @Self.advance.skipBalancedBracket
+    |)
+  ]
+
+  skipNestedBracket(@Self) ItemResult [
+    @Done Bool.new(@Self.atEnd)
+    ^(| @Done
+      (True) NotOk
+      (False) @Self.checkNestedBracket
+    |)
+  ]
+
+  checkNestedBracket(@Self) ItemResult [
+    @IsClose Bool.new(@Self.peekIsRBracket)
+    ^(| @IsClose
+      (True) @Self.advance.skipBalancedBracket
+      (False) @Self.advance.skipNestedBracket
+    |)
+  ]
+
+  skipNestedMatch(@Self) ItemResult [
+    @Done Bool.new(@Self.atEnd)
+    ^(| @Done
+      (True) NotOk
+      (False) @Self.checkNestedMatch
+    |)
+  ]
+
+  checkNestedMatch(@Self) ItemResult [
+    @IsClose Bool.new(@Self.peekIsCompositionClose)
+    ^(| @IsClose
+      (True) @Self.advance.skipBalancedBracket
+      (False) @Self.advance.skipNestedMatch
     |)
   ]
 ]

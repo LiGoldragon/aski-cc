@@ -1,8 +1,12 @@
 (Bootstrap)
 [Token (Token)
- Tokens (Tokens advance skipNewlines peekIsPascal peekIsLParen peekIsRParen peekIsLBrace peekIsRBrace)
- Parser (ParseResult DomainResult StructResult)]
+ Tokens (Tokens advance skipNewlines peekIsPascal peekIsLParen
+         peekIsRParen peekIsLBrace peekIsRBrace peekIsCamel
+         peekIsLBracket peekIsRBracket peekIsCompositionOpen peekIsCompositionClose
+         peekIsColon peekIsAt peekIsTilde peekIsUnderscore peekIsStub
+         peekIsBang)
+ Parser (ItemResult parseItem parseItems)]
 
 Main [
-  StdOut "aski bootstrap parser"
+  StdOut "aski-cc bootstrap"
 ]
