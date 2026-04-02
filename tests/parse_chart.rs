@@ -112,10 +112,10 @@ fn main() {{
     let stdout = String::from_utf8_lossy(&run.stdout);
     eprintln!("Output:\n{stdout}");
 
-    // chart.aski has 13 items: 7 domains + 3 structs + 3 impl blocks
+    // chart.aski has 16 items: 7 domains + 3 structs + 3 trait declarations + 3 trait impls
     assert!(
-        stdout.contains("Parsed 13 items"),
-        "should parse all 13 items from chart.aski:\n{stdout}"
+        stdout.contains("Parsed 16 items"),
+        "should parse all 16 items from chart.aski:\n{stdout}"
     );
 
     let _ = std::fs::remove_file(&rs_path);

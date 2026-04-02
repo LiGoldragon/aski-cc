@@ -6,15 +6,55 @@
 ItemResult (Parsed (Tokens) Failed (Tokens))
 
 ;; Continue parsing after a result
-ItemResult [
+resolve ([continueItems(@Self @Count U32) U32])
+
+resolve [ItemResult [
   ;; Pure aski — match on variant, extract tokens, recurse
   continueItems(@Self @Count U32) U32 (|
     (Parsed(@Toks)) @Toks.parseAllItems([@Count + 1])
     (Failed(@Toks))  @Count
   |)
-]
+]]
 
-Tokens [
+parse ([
+  parseAllItems(@Self @Count U32) U32
+  parseItem(@Self) ItemResult
+  dispatchItem(@Self) ItemResult
+  tryCamel(@Self) ItemResult
+  tryBang(@Self) ItemResult
+  parsePascalItem(@Self) ItemResult
+  checkPascalNotEnd(@Self) ItemResult
+  checkPascalBody(@Self) ItemResult
+  checkPascalBrace(@Self) ItemResult
+  checkPascalBracket(@Self) ItemResult
+  parseCamelItem(@Self) ItemResult
+  checkCamelNotEnd(@Self) ItemResult
+  checkCamelBody(@Self) ItemResult
+  checkCamelBracket(@Self) ItemResult
+  parseBangItem(@Self) ItemResult
+  skipToLBrace(@Self) ItemResult
+  checkLBrace(@Self) ItemResult
+  skipBalancedParen(@Self) ItemResult
+  checkRP(@Self) ItemResult
+  innerParen(@Self) ItemResult
+  innerParenBrace(@Self) ItemResult
+  skipNestedParen(@Self) ItemResult
+  checkNestedRP(@Self) ItemResult
+  skipBalancedBrace(@Self) ItemResult
+  checkRBrace(@Self) ItemResult
+  skipNestedBrace(@Self) ItemResult
+  checkNestedRBrace(@Self) ItemResult
+  skipBalancedBracket(@Self) ItemResult
+  checkRBracket(@Self) ItemResult
+  innerBracket(@Self) ItemResult
+  innerBracketComp(@Self) ItemResult
+  skipNestedBracket(@Self) ItemResult
+  checkNestedRBracket(@Self) ItemResult
+  skipNestedComp(@Self) ItemResult
+  checkNestedCompClose(@Self) ItemResult
+])
+
+parse [Tokens [
   parseAllItems(@Self @Count U32) U32 [|
     @Result ItemResult.new(@Self.parseItem)
     ^@Result.continueItems(@Count)
@@ -283,4 +323,4 @@ Tokens [
       (False) @Self.advance.skipNestedComp
     |)
   ]
-]
+]]
