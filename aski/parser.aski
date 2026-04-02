@@ -15,10 +15,10 @@ ItemResult [
 ]
 
 Tokens [
-  parseAllItems(@Self @Count U32) U32 [
+  parseAllItems(@Self @Count U32) U32 [|
     @Result ItemResult.new(@Self.parseItem)
     ^@Result.continueItems(@Count)
-  ]
+  |]
 
   parseItem(@Self) ItemResult [
     @Toks Tokens.new(@Self.skipNewlines)
