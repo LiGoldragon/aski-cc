@@ -27,6 +27,15 @@ Two databases:
                                     aski-rs → Rust → rustc
 ```
 
+## Current State (2026-04-02)
+
+- Pure aski parser: ZERO FFI stubs
+- Parses all 13 items from astro-aski chart.aski (7 domains, 3 structs, 3 impls)
+- DataCarrying pattern binding: `(Parsed(@Toks))` extracts inner Tokens
+- Actor model: observe borrows, transform moves
+- Tail-recursive item counting via `continueItems` matching method
+- Balanced delimiter skipping (nested parens, braces, brackets, composition)
+
 ## Build
 
 aski-cc is compiled from aski source by aski-rs:
@@ -37,7 +46,7 @@ aski-rs compiles aski/*.aski → Rust → aski-cc binary
 
 ## Dependencies
 
-- `aski-rs` (local path: ../aski-rs) — build dependency
+- `aski-rs` (local path: ../aski-rs) — build + dev dependency
 - The .aski source files in aski/ are the actual compiler
 
 ## VCS
