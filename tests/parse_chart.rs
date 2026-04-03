@@ -72,7 +72,7 @@ fn main() {{
     ];
     println!("Lexed {{}} tokens from chart.aski", tokens.len());
 
-    let t = Tokens {{ stream: tokens, pos: 0 }};
+    let t = Tokens {{ stream: tokens, position: 0 }};
 
     // Skip module header: ( ... )
     let t = t.skip_newlines();
