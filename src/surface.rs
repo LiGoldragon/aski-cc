@@ -18,8 +18,8 @@ ascent! {
     // ── Nodes ──
     // Every parsed item gets a node.
     // Shape matches aski-core::World::Node exactly (with spans).
-    relation Node(i64, String, String, Option<i64>, usize, usize);
-    // (id, kind, name, parent_id, span_start, span_end)
+    relation Node(i64, String, String, Option<i64>, usize, usize, Option<i64>);
+    // (id, kind, name, parent_id, span_start, span_end, scope_id)
     // kind: "domain", "struct", "trait_sig", "trait_impl", "method", "tail_method",
     //       "method_sig", "const", "main", "type_alias", "grammar_rule", "module"
 
@@ -105,12 +105,12 @@ ascent! {
     // (parent_type, child_type) — immediate containment
 
     ContainedType(parent_type, field_type) <--
-        Node(parent_id, kind, parent_type, _, _, _),
+        Node(parent_id, kind, parent_type, _, _, _, _),
         if kind == "struct",
         Field(*parent_id, _, _, field_type);
 
     ContainedType(parent_type, field_type.clone()) <--
-        Node(parent_id, kind, parent_type, _, _, _),
+        Node(parent_id, kind, parent_type, _, _, _, _),
         if kind == "domain",
         Variant(*parent_id, _, _, wraps),
         if wraps.is_some(),
@@ -126,11 +126,11 @@ ascent! {
     // (method_id, type_name)
 
     MethodOwner(method_id, type_name) <--
-        Node(method_id, kind, _, parent_opt, _, _),
+        Node(method_id, kind, _, parent_opt, _, _, _),
         if kind == "method" || kind == "tail_method",
         if parent_opt.is_some(),
         let pid = parent_opt.as_ref().unwrap(),
-        Node(pid, _, type_name, _, _, _);
+        Node(pid, _, type_name, _, _, _, _);
 
     // Trait method coverage: which traits are fully implemented for a type.
     // TODO: Derivation requires checking that every method_sig in the trait
@@ -158,8 +158,8 @@ mod tests {
         let mut db = create();
 
         // Insert nodes for two structs (now with span fields)
-        db.Node.push((0, "struct".into(), "Tree".into(), None, 0, 10));
-        db.Node.push((1, "struct".into(), "Branch".into(), None, 11, 20));
+        db.Node.push((0, "struct".into(), "Tree".into(), None, 0, 10, None));
+        db.Node.push((1, "struct".into(), "Branch".into(), None, 11, 20, None));
 
         // Tree has a field of type Branch
         db.Field.push((0, 0, "branches".into(), "Branch".into()));
@@ -191,9 +191,9 @@ mod tests {
         let mut db = create();
 
         // A contains B, B contains C — no cycle
-        db.Node.push((0, "struct".into(), "A".into(), None, 0, 5));
-        db.Node.push((1, "struct".into(), "B".into(), None, 6, 10));
-        db.Node.push((2, "struct".into(), "C".into(), None, 11, 15));
+        db.Node.push((0, "struct".into(), "A".into(), None, 0, 5, None));
+        db.Node.push((1, "struct".into(), "B".into(), None, 6, 10, None));
+        db.Node.push((2, "struct".into(), "C".into(), None, 11, 15, None));
         db.Field.push((0, 0, "b".into(), "B".into()));
         db.Field.push((1, 0, "c".into(), "C".into()));
 
@@ -213,11 +213,9 @@ mod tests {
         let mut db = create();
 
         // impl body node for type "Point"
-        db.Node.push((1, "impl_body".into(), "Point".into(), None, 0, 50));
-        // method "distance" owned by Point
-        db.Node.push((2, "method".into(), "distance".into(), Some(1), 5, 20));
-        // tail_method "scale" owned by Point
-        db.Node.push((3, "tail_method".into(), "scale".into(), Some(1), 21, 40));
+        db.Node.push((1, "impl_body".into(), "Point".into(), None, 0, 50, None));
+        db.Node.push((2, "method".into(), "distance".into(), Some(1), 5, 20, None));
+        db.Node.push((3, "tail_method".into(), "scale".into(), Some(1), 21, 40, None));
 
         resolve(&mut db);
 
@@ -229,8 +227,8 @@ mod tests {
     fn domain_variant_containment() {
         let mut db = create();
 
-        db.Node.push((0, "domain".into(), "Expr".into(), None, 0, 20));
-        db.Node.push((1, "struct".into(), "Term".into(), None, 21, 30));
+        db.Node.push((0, "domain".into(), "Expr".into(), None, 0, 20, None));
+        db.Node.push((1, "struct".into(), "Term".into(), None, 21, 30, None));
         db.Variant.push((0, 0, "Lit".into(), Some("Term".into())));
         db.Variant.push((0, 1, "Empty".into(), None));
 
